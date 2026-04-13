@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 import time
 from fluxo_anular import anular
+from fluxo_aprovar import aprovar
 
 load_dotenv()
 sistema = os.getenv('SISTEMA')
@@ -152,7 +153,7 @@ for _, row in df.iterrows():
     if data_row['valor_anulacao'] != 0:
         anular(em, data_row)
     elif data_row['valor_aprovacao'] != 0:
-        aprovar()
+        aprovar(em, data_row)
 
 print('Fluxo finalizado')
 em.terminate()
