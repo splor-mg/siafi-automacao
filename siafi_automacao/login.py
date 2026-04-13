@@ -14,7 +14,7 @@ senha = os.getenv('SENHA')
 unidade_executora = os.getenv('UNIDADE_EXECUTORA')
 
 month = datetime.today().strftime("%m")
-em = Emulator(visible=True)
+em = Emulator()
 em.connect('bhmvsb.prodemge.gov.br')
 em.wait_for_field()
 
@@ -44,8 +44,7 @@ while tentativas < max_tentativas:
             print(f"Tentativa {tentativas + 1} - tela intermediária, avançando...")
             em.send_enter()
 
-    except ValueError:
-        # Tela SEM campo editável — é a tela de aviso, só dá Enter e segue
+    except:
         print(f"Tentativa {tentativas + 1} - tela de aviso detectada, passando...")
         em.send_enter()
 
@@ -78,7 +77,7 @@ while tentativas < max_tentativas:
             print(f"Tentativa {tentativas + 1} - tela intermediária, avançando...")
             em.send_enter()
 
-    except ValueError:
+    except:
         # Tela SEM campo editável — é a tela de aviso, só dá Enter e segue
         print(f"Tentativa {tentativas + 1} - tela de aviso detectada, passando...")
         em.send_enter()
