@@ -14,7 +14,7 @@ senha = os.getenv('SENHA')
 unidade_executora = os.getenv('UNIDADE_EXECUTORA')
 
 month = datetime.today().strftime("%m")
-em = Emulator()
+em = Emulator(visible=True) ##caso queira que a tela apareça utilize visible=True
 em.connect('bhmvsb.prodemge.gov.br')
 em.wait_for_field()
 
@@ -120,6 +120,7 @@ for _, row in df.iterrows():
     data_row['acao'] = str(int(row['Ação']))
     data_row['tipo_global'] = row['GLOBAL'] if pd.notna(row['GLOBAL']) else '0'
     data_row['tipo_amarrado'] = str(int(row['AMARRADO'])) if pd.notna(row['AMARRADO']) else '0'
+    data_row['uo_financiadora'] = str(int(row['UO Financiadora'])) if pd.notna(row['UO Financiadora']) else '0'
     if pd.notna(row['AMARRADO']):
         amarrado = str(int(row['AMARRADO']))
         data_row['elemento'] = amarrado[:2]   # dois primeiros digitos
@@ -142,9 +143,9 @@ for _, row in df.iterrows():
         print(f"realizando procedimento de aprovação")
             
     if data_row['tipo_global'] == 'x':
-        print(f"Processando UO: {data_row['uo']}, Grupo: {data_row['grupo']}, IAG: {data_row['iag']}, Fonte: {data_row['fonte']}, Procedencia: {data_row['procedencia']}, Valor Anulação: {data_row['valor_anulacao']}")
+        print(f"Processando UO: {data_row['uo']}, Grupo: {data_row['grupo']}, Acao: {data_row['acao']}, Fonte: {data_row['fonte']}, Procedencia: {data_row['procedencia']}, Valor: {data_row['valor']}")
     elif data_row['tipo_amarrado'] != '0':
-        print(f"Processando UO: {data_row['uo']}, Grupo: {data_row['grupo']}, IAG: {data_row['iag']}, Fonte: {data_row['fonte']}, Procedencia: {data_row['procedencia']}, Valor Anulação: {data_row['valor_anulacao']}")
+        print(f"Processando UO: {data_row['uo']}, Grupo: {data_row['grupo']}, Acao: {data_row['acao']}, Fonte: {data_row['fonte']}, Procedencia: {data_row['procedencia']}, Valor: {data_row['valor']}")
 
     # -------------------- exemplo para orquestrar o fluxo --------------------
     # aqui você pode inspecionar o data_row e decidir se é anulação ou aprovação, global ou amarrado, e então chamar as funções correspondentes
