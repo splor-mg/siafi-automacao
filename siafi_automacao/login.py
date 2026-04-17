@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from py3270 import Emulator
 from datetime import datetime
 import pandas as pd
+import openpyxl
 import time
 from fluxo_anular import anular
 from fluxo_aprovar import aprovar
@@ -14,7 +15,7 @@ senha = os.getenv('SENHA')
 unidade_executora = os.getenv('UNIDADE_EXECUTORA')
 
 month = datetime.today().strftime("%m")
-em = Emulator(visible=True) ##caso queira que a tela apareça utilize visible=True
+em = Emulator() ##caso queira que a tela apareça utilize visible=True
 em.connect('bhmvsb.prodemge.gov.br')
 em.wait_for_field()
 
@@ -105,9 +106,15 @@ em.send_enter()
 em.wait_for_field()
 
 # Leitura da planilha e processamento dos dados
-df = pd.read_excel('/home/guilhermemelof/code/splor-mg/siafi-automacao/data/teste_automacao.xlsx', sheet_name='Remanejamento Cota Orçamentaria')
+
+CAMINHO_PLANILHA = '/home/guilhermemelof/code/splor-mg/siafi-automacao/data/teste_automacao.xlsx'
+#CAMINHO_PLANILHA = '/mnt/c/Users/x70167581686/OneDrive - CAMG/General/@dcmefo/2026/Robo - Remanejamento e aprovacao de cota/Robo (IPU 2)/copia.xlsx'
+SHEET_NAME = 'Remanejamento Cota Orçamentaria'
+
+df = pd.read_excel(CAMINHO_PLANILHA, sheet_name=SHEET_NAME)
 df = df.dropna(how='all')  # remove linhas completamente vazias
 df = df.sort_values(by=['Anular', 'UO_COD'], ascending=[True, True]) # ordena por anulação e depois por UO
+#df = df.reset_index(drop=False)
 
 for _, row in df.iterrows():
     data_row = {}
