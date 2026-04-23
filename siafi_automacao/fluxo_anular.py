@@ -42,7 +42,6 @@ def anular(em, data_row):
                 ##interrompe o fluxo e segue para a proxima etapa, para evitar erros de preenchimento
                 break
 
-
         #digitar as informações das ações e valores...
         em.fill_field(16, 17, data_row['acao'], 4) # ação
         em.fill_field(16, 22, '0001', 4)

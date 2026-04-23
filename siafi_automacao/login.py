@@ -1,4 +1,5 @@
 import os
+import shutil
 from dotenv import load_dotenv
 from py3270 import Emulator
 from datetime import datetime
@@ -15,7 +16,36 @@ senha = os.getenv('SENHA')
 unidade_executora = os.getenv('UNIDADE_EXECUTORA')
 
 month = datetime.today().strftime("%m")
-em = Emulator() ##caso queira que a tela apareça utilize visible=True
+
+# Definição dos CAMINHOS
+# Caminho original no OneDrive — apenas leitura, nunca será modificado
+CAMINHO_ONEDRIVE  = '/mnt/c/Users/x70167581686/OneDrive - CAMG/General/@dcmefo/2026/Robo - Remanejamento e aprovacao de cota/Robo (IPU 2)/copia.xlsx'
+
+# Cópia local de trabalho — onde o robô vai ler e salvar durante a execução... ele é criado a partir do original do OneDrive e só é salvo no final, para evitar conflitos de acesso com o OneDrive
+CAMINHO_LOCAL     = '/home/guilhermemelof/code/splor-mg/siafi-automacao/data/copia.xlsx'
+
+# Destino final no OneDrive — arquivo de conferência gerado ao final
+CAMINHO_DESTINO   = '/mnt/c/Users/x70167581686/OneDrive - CAMG/General/@dcmefo/2026/Robo - Remanejamento e aprovacao de cota/Conferencia arquivo robo/Conferencia arquivo robo.xlsx'
+
+#Nome da aba na planilha Excel onde estão os dados a serem processados
+SHEET_NAME = 'Remanejamento Cota Orçamentaria'
+
+# -----------------------------------------------------------------------
+# ETAPA 1: copia o original do OneDrive para o caminho local de trabalho.
+# O OneDrive não será mais tocado até o final do processamento.
+# A pasta local é criada automaticamente se não existir.
+# -----------------------------------------------------------------------
+os.makedirs(os.path.dirname(CAMINHO_LOCAL), exist_ok=True)
+shutil.copy2(CAMINHO_ONEDRIVE, CAMINHO_LOCAL)
+print(f"Arquivo copiado para trabalho local: {CAMINHO_LOCAL}")
+
+# -----------------------------------------------------------------------
+# ETAPA 2: garante que a pasta de destino no OneDrive existe.
+# Se a pasta "Conferencia arquivo robo" ainda não foi criada, ela é criada aqui.
+# -----------------------------------------------------------------------
+os.makedirs(os.path.dirname(CAMINHO_DESTINO), exist_ok=True)
+
+em = Emulator(visible=True) ##caso queira que a tela apareça utilize visible=True
 em.connect('bhmvsb.prodemge.gov.br')
 em.wait_for_field()
 
@@ -107,16 +137,24 @@ em.wait_for_field()
 
 # Leitura da planilha e processamento dos dados
 
-CAMINHO_PLANILHA = '/home/guilhermemelof/code/splor-mg/siafi-automacao/data/teste_automacao.xlsx'
-#CAMINHO_PLANILHA = '/mnt/c/Users/x70167581686/OneDrive - CAMG/General/@dcmefo/2026/Robo - Remanejamento e aprovacao de cota/Robo (IPU 2)/copia.xlsx'
-SHEET_NAME = 'Remanejamento Cota Orçamentaria'
-
-df = pd.read_excel(CAMINHO_PLANILHA, sheet_name=SHEET_NAME)
+# -----------------------------------------------------------------------
+# ETAPA 3: leitura da cópia LOCAL (não do OneDrive)
+# -----------------------------------------------------------------------
+df = pd.read_excel(CAMINHO_LOCAL, sheet_name=SHEET_NAME)
 df = df.dropna(how='all')  # remove linhas completamente vazias
 df = df.sort_values(by=['Anular', 'UO_COD'], ascending=[True, True]) # ordena por anulação e depois por UO
-#df = df.reset_index(drop=False)
+df = df.reset_index(drop=False)
 
-for _, row in df.iterrows():
+# Garante que a coluna 'Progresso' existe no DataFrame.
+# Se a planilha já tiver a coluna de uma execução anterior, ela é mantida.
+# Se não tiver, é criada vazia para receber os retornos desta execução.
+df['Progresso'] = df['Progresso'].astype(str) if 'Progresso' in df.columns else ''
+df['Progresso'] = df['Progresso'].astype(object)
+
+# O loop agora usa "for idx, row" em vez de "for _, row".
+# O idx é o índice real da linha no DataFrame e é necessário para que o
+# df.at[idx, 'Progresso'] grave o retorno na linha correta em memória.
+for idx, row in df.iterrows():
     data_row = {}
     data_row['month']   = month
     data_row['uo']      = str(int(row['UO_COD']))
@@ -144,6 +182,11 @@ for _, row in df.iterrows():
     else:
         data_row['valor'] = int(round(float(row['Aprovar']), 2) * 100)
 
+    # 'retorno' é inicializado vazio antes de cada linha para evitar que,
+    # em caso de erro inesperado, o retorno de uma linha anterior seja
+    # gravado incorretamente na linha atual.
+    retorno = ''
+
     if data_row['valor_anulacao'] != 0:
         print(f"realizando procedimento de anulação")
     elif data_row['valor_aprovacao'] != 0:
@@ -158,9 +201,36 @@ for _, row in df.iterrows():
     # aqui você pode inspecionar o data_row e decidir se é anulação ou aprovação, global ou amarrado, e então chamar as funções correspondentes
 
     if data_row['valor_anulacao'] != 0:
-        anular(em, data_row)
+        retorno = anular(em, data_row)
     elif data_row['valor_aprovacao'] != 0:
-        aprovar(em, data_row)
+        retorno = aprovar(em, data_row)
 
-print('Fluxo finalizado')
+    # Grava o retorno do SIAFI na coluna 'Progresso' do DataFrame em memória,
+    # na linha correspondente (idx). Nenhum arquivo é aberto ou salvo aqui —
+    # tudo fica em RAM até o fim do loop, evitando conflitos com o OneDrive.
+    df.at[idx, 'Progresso'] = retorno
+    print(f"Progresso gravado em memória — linha {idx}: {retorno}")
+
+print('Fluxo finalizado — salvando planilha...')
+
+# -----------------------------------------------------------------------
+# ETAPA 4: salva o DataFrame processado na cópia local.
+# O arquivo local recebe todos os dados incluindo a coluna Progresso.
+# - mode='a'                  → abre a planilha existente sem apagar outras abas
+# - if_sheet_exists='overlay' → sobrescreve apenas a aba alvo
+# - index=False               → não grava o índice do DataFrame como coluna
+# -----------------------------------------------------------------------
+with pd.ExcelWriter(CAMINHO_LOCAL, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+    df.to_excel(writer, sheet_name=SHEET_NAME, index=False)
+
+print(f"Planilha salva localmente: {CAMINHO_LOCAL}")
+
+# -----------------------------------------------------------------------
+# ETAPA 5: copia o arquivo local processado para o destino no OneDrive,
+# já com o novo nome "Conferencia arquivo robo.xlsx".
+# O original em "Robo (IPU 2)/copia.xlsx" permanece intacto.
+# -----------------------------------------------------------------------
+shutil.copy2(CAMINHO_LOCAL, CAMINHO_DESTINO)
+print(f"Arquivo de conferência salvo no OneDrive: {CAMINHO_DESTINO}")
+
 em.terminate()
