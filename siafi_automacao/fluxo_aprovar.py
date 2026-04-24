@@ -47,6 +47,7 @@ def aprovar(em, data_row):
         em.fill_field(16, 22, '0001', 4)
         em.fill_field(16, 36, str(data_row['valor']), 15) # valor
         em.send_enter()
+        time.sleep(1)
         em.wait_for_field()
         retorno = em.string_get(1, 1, 80).strip()
         if retorno in (
@@ -65,6 +66,7 @@ def aprovar(em, data_row):
             em.wait_for_field()
             em.send_pf(5)  # envia F5
             em.wait_for_field()
+            time.sleep(1)
             retorno = em.string_get(1, 1, 80).strip()
             break
 
